@@ -1,0 +1,21 @@
+{
+ "v2|gemma3:4b|space|ru_n5": "SGGGSSGSSSSSSSGFGSSSFSSSGSGGGS",
+ "v2|gemma3:4b|space|ru_n10": "GSGGSGGSSSSGGGGFGSGSGSSSGSGGGS",
+ "v2|gemma3:4b|web|ru_n5": "GSGSGGSSGSSGSSSNGGGSSGGSSSSFSS",
+ "v2|gemma3:4b|web|ru_n10": "GSGSGGSSSSSSSGSGSGSGSSSGGFGGGG",
+ "v2|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|space|ru_n5": "GSSSGGGGGSSSGSSFGSGGGGGSGGGSGG",
+ "v2|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|space|ru_n10": "GSGSGGGSGGGGGGGFGGSSGSGSGGSSSG",
+ "v2|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|web|ru_n5": "GSGSGGSGSGSGGGGGFGGGSSGSSSSSGS",
+ "v2|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|web|ru_n10": "GSGSGGGSGSSSGSGGFGGGGSSSGGSSGS",
+ "v2|saiga-mistral-fixed|space|ru_n5": "SSGSSSSSGGGSFSFSSSGSSSSGSSSSGG",
+ "v2|saiga-mistral-fixed|space|ru_n10": "SSSGSSSFSSSSSSSSSGGSSSSSFSSGSG",
+ "v3a|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|space|ru_n10": "SGSGGGGGGGGGSGGGGGGGGSGSGGSGGG",
+ "v3a|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|web|ru_n10": "SSGGGGGSSSGGGGGSGSGGSGGGGGGGGG",
+ "v3a_hi|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|space|ru_n10": "GGGGSGGGSGGGGSGGSSSGSGGGGGGGGG",
+ "v3a_hi|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|web|ru_n10": "GGGGSGGGGGSGGGGSGSSSGSSGGGSGGG",
+ "v3a|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|space|ru_n5": "SGGGGSGGGSGSSGGGGGGSGGGGGGGSSG",
+ "v3a|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|web|ru_n5": "GSGGGGSGSSGGGGSSGGSGGSGGSSGGGG",
+ "v3b2_agree_k1|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|space|ru_n10": "GGGGGGGGGSGGSGSGSGGGGGSFGGSSGG",
+ "v3final|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|space|ru_n10": "SGGGGGGGGSGGSSGGGSSGGGGGGGSSGG",
+ "v3final|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|web|ru_n10": "GSGGGGGGGSSGGSGSGGGGGGSSGSGGGS"
+}

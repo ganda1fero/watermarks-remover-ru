@@ -1,0 +1,332 @@
+{
+ "qwen2.5:7b|space|ru_n5": {
+  "G": 6,
+  "F": 1,
+  "N": 1,
+  "S": 7
+ },
+ "qwen2.5:7b|space|ru_n10": {
+  "G": 5,
+  "F": 4,
+  "N": 2,
+  "S": 4
+ },
+ "qwen2.5:7b|space|ru_n15": {
+  "G": 6,
+  "F": 0,
+  "N": 1,
+  "S": 8
+ },
+ "qwen2.5:7b|space|ru_s10": {
+  "G": 7,
+  "F": 3,
+  "N": 2,
+  "S": 3
+ },
+ "qwen2.5:7b|space|en_n10": {
+  "G": 4,
+  "F": 5,
+  "N": 1,
+  "S": 5
+ },
+ "qwen2.5:7b|web|ru_n5": {
+  "G": 8,
+  "F": 2,
+  "N": 0,
+  "S": 5
+ },
+ "qwen2.5:7b|web|ru_n10": {
+  "G": 8,
+  "F": 4,
+  "N": 0,
+  "S": 3
+ },
+ "qwen2.5:7b|web|ru_n15": {
+  "G": 5,
+  "F": 4,
+  "N": 0,
+  "S": 6
+ },
+ "qwen2.5:7b|web|ru_s10": {
+  "G": 9,
+  "F": 3,
+  "N": 0,
+  "S": 3
+ },
+ "qwen2.5:7b|web|en_n10": {
+  "G": 4,
+  "F": 5,
+  "N": 0,
+  "S": 6
+ },
+ "qwen2.5:14b|space|ru_n5": {
+  "G": 8,
+  "F": 2,
+  "N": 1,
+  "S": 4
+ },
+ "qwen2.5:14b|space|ru_n10": {
+  "G": 7,
+  "F": 4,
+  "N": 2,
+  "S": 2
+ },
+ "qwen2.5:14b|space|ru_s10": {
+  "G": 5,
+  "F": 2,
+  "N": 0,
+  "S": 8
+ },
+ "qwen2.5:14b|space|en_n10": {
+  "G": 8,
+  "F": 0,
+  "N": 1,
+  "S": 6
+ },
+ "qwen2.5:14b|web|ru_n5": {
+  "G": 7,
+  "F": 3,
+  "N": 0,
+  "S": 5
+ },
+ "qwen2.5:14b|web|ru_n10": {
+  "G": 6,
+  "F": 2,
+  "N": 0,
+  "S": 7
+ },
+ "qwen2.5:14b|web|ru_s10": {
+  "G": 8,
+  "F": 2,
+  "N": 1,
+  "S": 4
+ },
+ "qwen2.5:14b|web|en_n10": {
+  "G": 8,
+  "F": 2,
+  "N": 1,
+  "S": 4
+ },
+ "v2|qwen2.5:7b|space|ru_n10": {
+  "G": 7,
+  "F": 0,
+  "N": 0,
+  "S": 8
+ },
+ "v2|qwen2.5:7b|space|ru_n3": {
+  "G": 4,
+  "F": 1,
+  "N": 0,
+  "S": 10
+ },
+ "v2|qwen2.5:7b|space|ru_n20": {
+  "G": 7,
+  "F": 1,
+  "N": 0,
+  "S": 7
+ },
+ "v2|qwen2.5:7b|space|ru_n30": {
+  "G": 6,
+  "F": 1,
+  "N": 0,
+  "S": 8
+ },
+ "v2|qwen2.5:7b|web|ru_n10": {
+  "G": 5,
+  "F": 2,
+  "N": 0,
+  "S": 8
+ },
+ "v2|qwen2.5:7b|web|ru_n3": {
+  "G": 6,
+  "F": 1,
+  "N": 0,
+  "S": 8
+ },
+ "v2|qwen2.5:7b|web|ru_n20": {
+  "G": 3,
+  "F": 2,
+  "N": 0,
+  "S": 10
+ },
+ "v2|qwen2.5:7b|web|ru_n30": {
+  "G": 7,
+  "F": 0,
+  "N": 0,
+  "S": 8
+ },
+ "v2|gemma3:4b|space|ru_n5": {
+  "G": 10,
+  "F": 2,
+  "N": 0,
+  "S": 18
+ },
+ "v2|gemma3:4b|space|ru_n10": {
+  "G": 16,
+  "F": 1,
+  "N": 0,
+  "S": 13
+ },
+ "v2|gemma3:4b|web|ru_n5": {
+  "G": 11,
+  "F": 1,
+  "N": 1,
+  "S": 17
+ },
+ "v2|gemma3:4b|web|ru_n10": {
+  "G": 14,
+  "F": 1,
+  "N": 0,
+  "S": 15
+ },
+ "v2|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|space|ru_n5": {
+  "G": 18,
+  "F": 1,
+  "N": 0,
+  "S": 11
+ },
+ "v2|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|space|ru_n10": {
+  "G": 19,
+  "F": 1,
+  "N": 0,
+  "S": 10
+ },
+ "v2|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|web|ru_n5": {
+  "G": 16,
+  "F": 1,
+  "N": 0,
+  "S": 13
+ },
+ "v2|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|web|ru_n10": {
+  "G": 16,
+  "F": 1,
+  "N": 0,
+  "S": 13
+ },
+ "v2|saiga-mistral-fixed|space|ru_n5": {
+  "G": 8,
+  "F": 2,
+  "N": 0,
+  "S": 20
+ },
+ "v2|saiga-mistral-fixed|space|ru_n10": {
+  "G": 5,
+  "F": 2,
+  "N": 0,
+  "S": 23
+ },
+ "v3a|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|space|ru_n10": {
+  "G": 24,
+  "F": 0,
+  "N": 0,
+  "S": 6
+ },
+ "v3a|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|web|ru_n10": {
+  "G": 22,
+  "F": 0,
+  "N": 0,
+  "S": 8
+ },
+ "v3a_hi|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|space|ru_n10": {
+  "G": 23,
+  "F": 0,
+  "N": 0,
+  "S": 7
+ },
+ "v3a_hi|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|web|ru_n10": {
+  "G": 21,
+  "F": 0,
+  "N": 0,
+  "S": 9
+ },
+ "v3a|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|space|ru_n5": {
+  "G": 22,
+  "F": 0,
+  "N": 0,
+  "S": 8
+ },
+ "v3a|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|web|ru_n5": {
+  "G": 20,
+  "F": 0,
+  "N": 0,
+  "S": 10
+ },
+ "v3b2_agree_k1|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|space|ru_n10": {
+  "G": 22,
+  "F": 1,
+  "N": 0,
+  "S": 7
+ },
+ "v3final|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|space|ru_n10": {
+  "G": 22,
+  "F": 0,
+  "N": 0,
+  "S": 8
+ },
+ "v3final|yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest|web|ru_n10": {
+  "G": 21,
+  "F": 0,
+  "N": 0,
+  "S": 9
+ },
+ "sy_plain|OxW/Saiga_YandexGPT_8B:q4_K_M|space|ru_n10": {
+  "G": 16,
+  "F": 0,
+  "N": 0,
+  "S": 14
+ },
+ "sy_plain|OxW/Saiga_YandexGPT_8B:q4_K_M|web|ru_n10": {
+  "G": 17,
+  "F": 0,
+  "N": 0,
+  "S": 13
+ },
+ "g_final|gemma3:4b|space|ru_n10": {
+  "G": 20,
+  "F": 0,
+  "N": 0,
+  "S": 10
+ },
+ "g_final|gemma3:4b|web|ru_n10": {
+  "G": 17,
+  "F": 0,
+  "N": 0,
+  "S": 13
+ },
+ "g_plain|gemma3:4b|space|ru_n10": {
+  "G": 18,
+  "F": 0,
+  "N": 0,
+  "S": 12
+ },
+ "g_plain|gemma3:4b|web|ru_n10": {
+  "G": 14,
+  "F": 0,
+  "N": 0,
+  "S": 16
+ },
+ "tl_plain|t-tech/T-lite-it-2.1:q4_K_M|space|ru_n10": {
+  "G": 17,
+  "F": 0,
+  "N": 0,
+  "S": 13
+ },
+ "tl_plain|t-tech/T-lite-it-2.1:q4_K_M|web|ru_n10": {
+  "G": 22,
+  "F": 0,
+  "N": 0,
+  "S": 8
+ },
+ "tl_final3|t-tech/T-lite-it-2.1:q4_K_M|space|ru_n10": {
+  "G": 22,
+  "F": 0,
+  "N": 0,
+  "S": 8
+ },
+ "tl_final3|t-tech/T-lite-it-2.1:q4_K_M|web|ru_n10": {
+  "G": 23,
+  "F": 0,
+  "N": 0,
+  "S": 7
+ }
+}

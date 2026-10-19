@@ -1,0 +1,4 @@
+FROM cyberlis/saiga-mistral:7b-lora-custom-q4_K
+TEMPLATE """{{- range .Messages }}<s>{{ if eq .Role "assistant" }}bot{{ else }}{{ .Role }}{{ end }}
+{{ .Content }}</s>{{ end }}<s>bot
+"""

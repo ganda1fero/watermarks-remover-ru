@@ -1,0 +1,17 @@
+{
+ "gemma3:4b": {
+  "verify_min": 18.5,
+  "precision": 0.8,
+  "recall": 0.339
+ },
+ "t-tech/T-lite-it-2.1:q4_K_M": {
+  "verify_min": 1.0,
+  "precision": 0.817,
+  "recall": 0.797
+ },
+ "yandex/YandexGPT-5-Lite-8B-instruct-GGUF:latest": {
+  "verify_min": 17.0,
+  "precision": 0.81,
+  "recall": 0.724
+ }
+}

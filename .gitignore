@@ -1,0 +1,80 @@
+# Deny by default: only what is explicitly allowed below can be added to git.
+# Local test artifacts, secrets (.env), and tooling stay out without a rule
+# for each one. Tracked files are unaffected.
+/*
+!/.claude-plugin/
+!/.claude-plugin/**
+!/hooks/
+!/hooks/**
+!/.github/
+!/.github/**
+!/benchmarks/
+!/benchmarks/**
+!/config/
+!/config/**
+!/docs/
+!/docs/**
+!/service/
+!/service/**
+# A parent directory must be un-ignored before its children can be re-included.
+!/skills/
+!/skills/remove-ai-marks/
+!/skills/remove-ai-marks/**
+!/skills/clean-user-facing-text/
+!/skills/clean-user-facing-text/**
+!/tests/
+!/tests/**
+!/.coderabbit.yaml
+!/.dockerignore
+!/.env.example
+!/.gitattributes
+!/.gitignore
+!/.pre-commit-hooks.yaml
+!/CODE_OF_CONDUCT.md
+!/compose-check.sh
+!/compose.yaml
+!/CONTRIBUTING.md
+!/LICENSE
+!/Makefile
+!/pytest.ini
+!/README.md
+!/requirements-dev.txt
+!/ruff.toml
+!/SECURITY.md
+!/stealer/
+!/stealer/**
+
+# --- added in the ru fork -------------------------------------------------------
+# Installer and editor integrations that the upstream project tracks (they are
+# referenced by tests and the README), the new runtime requirements, the start
+# scripts, the notes about our changes and the swap experiments with their data.
+!/install_skill.py
+!/install-skill.sh
+!/integrations/
+!/integrations/**
+!/requirements.txt
+!/CHANGES-RU.md
+!/scripts/
+!/scripts/**
+!/start.bat
+!/experiments/
+!/experiments/**
+# Generated experiment output (rebuilt by the scripts above).
+experiments/swap_out/
+experiments/*.log
+experiments/ab_scores.json
+experiments/validator*_*.json
+
+# Exceptions even inside allowed trees
+.env
+**/__pycache__/
+*.pyc
+# The stealer's downloaded prompt corpus is generated data, not source.
+stealer/prompts/
+stealer/prompts/**
+.venv/
+.firecrawl/
+.figlet/
+posts.md
+*.cleaned.*
+*.bak
