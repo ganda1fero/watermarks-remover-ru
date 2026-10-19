@@ -161,13 +161,16 @@ def test_estimate_offers_every_layer_b_mode_with_ready_options(conn, monkeypatch
     monkeypatch.setenv("WATERMARKS_SWAP_VERIFY", "1")
     body = _post(conn, "/estimate", {"file": _b64(TEXT * 20), "name": "x.txt"})[1]
     modes = {m["id"]: m for m in body["modes"]}
-    assert set(modes) == {"paraphrase", "paraphrase_swap", "paraphrase_swap_fast", "swap_only"}
-    # the fastest is plain paraphrase; adding the swap step makes it longer, the check longer still
-    assert modes["paraphrase"]["relative_time"] == 1.0
+    assert set(modes) == {"paraphrase", "paraphrase_swap", "paraphrase_swap_fast", "swap_only", "swap_only_fast"}
+    # relative_time counts from the fastest mode; adding the swap step makes paraphrasing longer, the check longer still
+    assert min(m["relative_time"] for m in modes.values()) == 1.0
     assert (modes["paraphrase"]["expected_seconds"] < modes["paraphrase_swap_fast"]["expected_seconds"]
             < modes["paraphrase_swap"]["expected_seconds"])
     assert modes["paraphrase_swap"]["options"] == {"strategy": "paraphrase@0.8,swap@0.2", "meaning_check": True}
     assert modes["paraphrase"]["options"] == {"strategy": "paraphrase@0.8"}
+    assert modes["swap_only"]["options"] == {"strategy": "swap@0.2", "meaning_check": True}
+    assert modes["swap_only_fast"]["options"] == {"strategy": "swap@0.2", "meaning_check": False}
+    assert modes["swap_only_fast"]["expected_seconds"] < modes["swap_only"]["expected_seconds"]
     assert [m["id"] for m in body["modes"] if m["is_current"]] == ["paraphrase_swap"]
     assert all(m["available"] for m in body["modes"])
 
@@ -178,6 +181,7 @@ def test_modes_with_the_meaning_check_are_unavailable_without_ollama(conn, monke
     body = _post(conn, "/estimate", {"file": _b64(TEXT * 5), "name": "x.txt"})[1]
     modes = {m["id"]: m for m in body["modes"]}
     assert modes["paraphrase_swap"]["available"] is False and modes["paraphrase_swap"]["reason"]
+    assert modes["swap_only"]["available"] is False and modes["swap_only_fast"]["available"]
     assert modes["paraphrase"]["available"] and modes["paraphrase_swap_fast"]["available"]
 
 
