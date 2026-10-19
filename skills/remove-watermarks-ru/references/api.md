@@ -44,7 +44,7 @@ curl -s -X POST "$WM/patch"    -H "Content-Type: application/json" --data-binary
 | Параметр | Смысл |
 |---|---|
 | `report_edits` | вернуть список замен (слово, смещение, контекст) в `report.layer_b.steps[].swap.edits` |
-| `keep_model` | не выгружать модель после запроса (для серии частей подряд); в конце вызвать `POST /unload` |
+| `keep_model` | (необязательно) держать модель 10 минут после запроса; освободить сразу: `POST /unload`. Обычно не нужно: хватает `WATERMARKS_REWRITE_KEEP_ALIVE` |
 | `rewrite_model` | модель Ollama на этот запрос вместо `WATERMARKS_REWRITE_MODEL` |
 | `meaning_check` | включить (true) или выключить (false) проверку смысла замен на этот запрос |
 | `strategy` | стратегия слоя B: `paraphrase@0.8`, `swap@0.2` или `paraphrase@0.8,swap@0.2`; готовые наборы приходят в `modes` ответа `/estimate` |
@@ -53,7 +53,7 @@ curl -s -X POST "$WM/patch"    -H "Content-Type: application/json" --data-binary
 
 `model` (модель, которую сервис реально вызовет), `model_source` (`env` или `options.rewrite_model`),
 `meaning_check`, `words`, `basis` (оценка по реальным прогонам или по типовым значениям), `expected_seconds` и
-`expected_range_seconds` для текущей настройки сервиса, `chunk_plan` (`chunk_words`, `chunks`, `expected_seconds_if_chunked_keep_model`),
+`expected_range_seconds` для текущей настройки сервиса, `chunk_plan` (`chunk_words`, `chunks`, `model_stays_loaded_between_chunks`),
 `modes[]` (каждый режим слоя B: `id`, `title`, `note`, `options`, `expected_seconds`, `relative_time`,
 `available`, `is_current`) и `alternatives[]` (другие модели: `model`, `installed`, `expected_seconds`,
 `relative_time`, `quality`). Значения `options` из `modes` передаются в `/clean` как есть.

@@ -181,6 +181,18 @@ def text_guards(before: str, after: str) -> dict[str, Any]:
     }
 
 
+def keep_alive_seconds() -> float:
+    """WATERMARKS_REWRITE_KEEP_ALIVE in seconds (30s, 2m, 1h, 90, 0 = unload right away, -1 = never)."""
+    raw = os.environ.get("WATERMARKS_REWRITE_KEEP_ALIVE", "").strip().lower()
+    if not raw:
+        return 300.0  # Ollama's own default: five minutes
+    m = re.fullmatch(r"(-?\d+(?:\.\d+)?)\s*([smh]?)", raw)
+    if not m:
+        return 0.0
+    value = float(m.group(1)) * {"": 1, "s": 1, "m": 60, "h": 3600}[m.group(2)]
+    return float("inf") if value < 0 else value
+
+
 def _profiles() -> list[dict[str, Any]]:
     env = os.environ.get("WATERMARKS_MODEL_PROFILES_FILE", "").strip()
     path = Path(env) if env else Path(__file__).resolve().parents[2] / "config" / "model_profiles.json"
@@ -262,7 +274,9 @@ def estimate_text(
     per_chunk = chunk_words()
     chunks = max(1, math.ceil(words / per_chunk))
     # every request loads (and unloads) the model once per LLM step, so chunking adds loads
-    chunked_total = work_seconds + chunks * llm_steps * load
+    # the model stays loaded between chunks when the unload delay is long enough for the next chunk to arrive
+    keeps = keep_alive_seconds() >= 20
+    chunked_total = work_seconds + (1 if keeps else chunks) * llm_steps * load
     return {
         "words": words,
         "model": model,
@@ -279,8 +293,7 @@ def estimate_text(
             "chunk_words": per_chunk,
             "chunks": chunks,
             "expected_seconds_if_chunked": round(chunked_total),
-            # with options.keep_model the model is loaded once for all chunks (and freed by /unload)
-            "expected_seconds_if_chunked_keep_model": round(total),
+            "model_stays_loaded_between_chunks": keeps,
             "note": "a long text should be sent in chunks: progress is visible and a stop is possible between chunks",
         },
         "alternatives": _alternatives(total, detail, model, verify, base_url) if with_alternatives else [],

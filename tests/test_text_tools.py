@@ -336,9 +336,14 @@ def test_unload_frees_the_configured_model(conn, monkeypatch):
     assert status == 200 and body["unloaded"] is False
 
 
-def test_estimate_reports_single_load_time_for_keep_model(conn, monkeypatch):
+def test_estimate_counts_one_model_load_when_keep_alive_is_long(conn, monkeypatch):
     monkeypatch.setattr(server, "_DEFAULT_STRATEGY", "swap@0.2")
     monkeypatch.setattr(estimate, "installed_models", lambda base_url: None)
-    plan = _post(conn, "/estimate", {"file": _b64(TEXT * 40), "name": "x.txt"})[1]["chunk_plan"]
-    assert plan["chunks"] >= 2
-    assert plan["expected_seconds_if_chunked_keep_model"] < plan["expected_seconds_if_chunked"]
+    body = {"file": _b64(TEXT * 40), "name": "x.txt"}
+    monkeypatch.setenv("WATERMARKS_REWRITE_KEEP_ALIVE", "0")
+    short = _post(conn, "/estimate", body)[1]["chunk_plan"]
+    monkeypatch.setenv("WATERMARKS_REWRITE_KEEP_ALIVE", "30s")
+    long_ = _post(conn, "/estimate", body)[1]["chunk_plan"]
+    assert short["chunks"] >= 2 and short["model_stays_loaded_between_chunks"] is False
+    assert long_["model_stays_loaded_between_chunks"] is True
+    assert long_["expected_seconds_if_chunked"] < short["expected_seconds_if_chunked"]

@@ -988,8 +988,9 @@ def _swap_words(
                         reasoning_effort, keep_alive=loop_keep,
                         max_tokens=max_reply,
                     )
-                except Exception:  # transport failure: skip this word for now
+                except Exception as exc:  # transport failure: skip this word for now
                     stats["errors"] += 1
+                    stats["last_error"] = f"{type(exc).__name__}: {exc}"[:200]
                     continue
                 guess = _parse_swap_reply(reply)
                 if guess is None:
@@ -1022,8 +1023,9 @@ def _swap_words(
                         stats["verify_calls"] += 1
                         score = _verify_score(base_url, verify_model, vprompt,
                                               min(timeout, call_timeout), loop_keep)
-                    except Exception:  # checker unreachable: skip this word for now
+                    except Exception as exc:  # checker unreachable: skip this word for now
                         stats["errors"] += 1
+                        stats["last_error"] = f"{type(exc).__name__}: {exc}"[:200]
                         continue
                     if score < verify_min:
                         stats["verify_rejected"] += 1
@@ -1059,7 +1061,10 @@ def _swap_words(
             f"words; their context window was reduced"
         )
     if stats["errors"]:
-        warnings.append(f"swap: {stats['errors']} LLM calls failed and were skipped")
+        warnings.append(
+            f"swap: {stats['errors']} LLM calls failed and were skipped"
+            + (f" (last error: {stats['last_error']})" if stats.get("last_error") else "")
+        )
     for w in warnings:
         eprint(w)
     if collect_edits:
@@ -1836,9 +1841,10 @@ def apply_strategy(
                     rewrite_level=intensity,
                     style=style,
                 )
+                extra_kw = {} if keep is None else {"keep_alive": keep}
                 return _generate_once(
                     backend, base_url, model, api_key, prompt, timeout, temperature,
-                    reasoning_effort, keep_alive=keep,
+                    reasoning_effort, **extra_kw,
                 )
 
             parts = _paragraph_parts(cur) if tactic == "paraphrase" and _per_paragraph() else None
