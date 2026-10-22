@@ -156,12 +156,20 @@ def test_estimate_prices_the_meaning_check_and_sizes_chunks_by_the_context_windo
 
 
 def test_estimate_offers_every_layer_b_mode_with_ready_options(conn, monkeypatch):
-    monkeypatch.setattr(server, "_DEFAULT_STRATEGY", "paraphrase@0.8,swap@0.2")
+    monkeypatch.setattr(server, "_DEFAULT_STRATEGY", "refresh@0.8,swap@0.2")
     monkeypatch.setattr(estimate, "installed_models", lambda base_url: None)
     monkeypatch.setenv("WATERMARKS_SWAP_VERIFY", "1")
     body = _post(conn, "/estimate", {"file": _b64(TEXT * 20), "name": "x.txt"})[1]
     modes = {m["id"]: m for m in body["modes"]}
-    assert set(modes) == {"paraphrase", "paraphrase_swap", "paraphrase_swap_fast", "swap_only", "swap_only_fast"}
+    assert set(modes) == {
+        "refresh_swap", "refresh_swap_fast", "refresh", "paraphrase", "paraphrase_swap", "paraphrase_swap_fast",
+        "swap_only", "swap_only_fast",
+    }
+    assert modes["refresh_swap"]["options"] == {"strategy": "refresh@0.8,swap@0.2", "meaning_check": True}
+    assert modes["refresh"]["options"] == {"strategy": "refresh@0.8"}
+    # refresh rewrites only a part of the paragraphs, so it is cheaper than paraphrasing everything
+    assert modes["refresh"]["expected_seconds"] < modes["paraphrase"]["expected_seconds"]
+    assert modes["refresh_swap"]["expected_seconds"] < modes["paraphrase_swap"]["expected_seconds"]
     # relative_time counts from the fastest mode; adding the swap step makes paraphrasing longer, the check longer still
     assert min(m["relative_time"] for m in modes.values()) == 1.0
     assert (modes["paraphrase"]["expected_seconds"] < modes["paraphrase_swap_fast"]["expected_seconds"]
@@ -171,7 +179,7 @@ def test_estimate_offers_every_layer_b_mode_with_ready_options(conn, monkeypatch
     assert modes["swap_only"]["options"] == {"strategy": "swap@0.2", "meaning_check": True}
     assert modes["swap_only_fast"]["options"] == {"strategy": "swap@0.2", "meaning_check": False}
     assert modes["swap_only_fast"]["expected_seconds"] < modes["swap_only"]["expected_seconds"]
-    assert [m["id"] for m in body["modes"] if m["is_current"]] == ["paraphrase_swap"]
+    assert [m["id"] for m in body["modes"] if m["is_current"]] == ["refresh_swap"]
     assert all(m["available"] for m in body["modes"])
 
 

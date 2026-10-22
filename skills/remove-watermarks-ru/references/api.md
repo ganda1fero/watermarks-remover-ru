@@ -47,7 +47,7 @@ curl -s -X POST "$WM/patch"    -H "Content-Type: application/json" --data-binary
 | `keep_model` | (необязательно) держать модель 10 минут после запроса; освободить сразу: `POST /unload`. Обычно не нужно: хватает `WATERMARKS_REWRITE_KEEP_ALIVE` |
 | `rewrite_model` | модель Ollama на этот запрос вместо `WATERMARKS_REWRITE_MODEL` |
 | `meaning_check` | включить (true) или выключить (false) проверку смысла замен на этот запрос |
-| `strategy` | стратегия слоя B: `paraphrase@0.8`, `swap@0.2` или `paraphrase@0.8,swap@0.2`; готовые наборы приходят в `modes` ответа `/estimate` |
+| `strategy` | стратегия слоя B: `refresh@0.8` (освежение), `swap@0.2`, `paraphrase@0.8` или сочетания, например `refresh@0.8,swap@0.2` (по умолчанию); готовые наборы приходят в `modes` ответа `/estimate` |
 
 ## Ответ `/estimate`
 

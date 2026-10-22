@@ -55,6 +55,7 @@ import math
 import os
 import random
 import re
+import statistics
 import sys
 import time
 import urllib.error
@@ -97,6 +98,19 @@ PROMPTS = {
         "em dashes, bold text, emojis, or curly quotes. Preserve all facts, numbers, "
         "names, and technical identifiers. Do not add or remove claims. Output only the "
         "rewritten text.\n\n---\n{TEXT}"
+    ),
+    # Russian counterpart of `humanize`: the English prompt's word lists mean nothing for Russian text.
+    "humanize_ru": (
+        "Перепиши текст ниже так, чтобы он читался как написанный живым человеком, а не языковой моделью. "
+        "Перестрой предложения как считаешь нужным. Намеренно меняй длину предложений: короткие чередуй с "
+        "длинными, без ровного «среднего» ритма. Убери канцелярит и штампы («является», «осуществляется», "
+        "«в рамках», «данный», «стоит отметить», «важно подчеркнуть», «играет важную роль», «широкий "
+        "спектр», «таким образом», «в заключение»), лишние причастные и деепричастные обороты, пафос, "
+        "перечисления по три и фразы, которые лишь анонсируют следующую. Выбирай конкретное слово вместо "
+        "абстрактного, простой глагол вместо отглагольного существительного. Текст может звучать немного "
+        "неровно, это нормально. Каждый факт, число, единица измерения, дата, имя, название, термин, "
+        "формула и цитата должны остаться без изменений. Ничего не добавляй и не убирай по смыслу. Не "
+        "объединяй абзацы и не разбивай их. Выведи только переписанный текст.\n\n---\n{TEXT}"
     ),
     "code": (
         "Rewrite the natural-language parts of this code — comments, docstrings, and "
@@ -316,6 +330,9 @@ def _tactic_prompt(tactic: str, text: str, lang: str, original_lang: str) -> str
     if tactic == "paraphrase":
         return PROMPTS["paraphrase"].format(TEXT=text)
     if tactic == "humanize":
+        letters = [c for c in text if c.isalpha()]
+        if letters and sum(1 for c in letters if "Ѐ" <= c <= "ӿ") / len(letters) > 0.5:
+            return PROMPTS["humanize_ru"].format(TEXT=text)
         return PROMPTS["humanize"].format(TEXT=text)
     if tactic == "code":
         return PROMPTS["code"].format(TEXT=text)
@@ -1672,7 +1689,7 @@ def rewrite(
 # Tactics accepted by a strategy spec. `mlm` is a local masked-LM edit; the
 # rest go through the configured rewrite backend.
 KNOWN_TACTICS = frozenset(
-    {"paraphrase", "backtranslate", "structural", "humanize", "code", "chunk", "swap", "mlm"}
+    {"paraphrase", "backtranslate", "structural", "humanize", "code", "chunk", "swap", "mlm", "refresh"}
 )
 LLM_TACTICS = frozenset(KNOWN_TACTICS - {"mlm"})
 
@@ -1767,6 +1784,135 @@ def _paraphrase_paragraphs(
     return "".join(out), st
 
 
+# --- refresh: rewrite only the paragraphs that read like machine text ------------------------------
+
+_RU_CLICHES = (
+    "является", "являются", "осуществляется", "осуществляют", "осуществление", "в рамках", "данный", "данная",
+    "данное", "данные", "стоит отметить", "важно отметить", "важно подчеркнуть", "следует отметить",
+    "играет важную роль", "играют важную роль", "широкий спектр", "таким образом", "в заключение",
+    "в современном мире", "с целью", "представляет собой", "на основе", "в связи с", "кроме того",
+    "необходимо", "ключевой", "комплексный", "эффективный", "уникальный", "позволяет", "обеспечивает",
+    "в целом", "в данном случае", "на сегодняшний день", "в настоящее время",
+)
+_NOMINAL = re.compile(r"\b\w{3,}(?:ение|ание|ость|ация|ирование)\b", re.IGNORECASE)
+_SENT_SPLIT = re.compile(r"(?<=[.!?…])\s+")
+_NUM_TOKEN = re.compile(r"\d[\d.,]*\d|\d")
+_CAP_WORD = re.compile(r"(?<![.!?]\s)(?<!^)\b[А-ЯЁA-Z][а-яёa-z\-]{2,}")
+
+
+def paragraph_machine_score(par: str) -> dict[str, Any]:
+    """How machine-like a Russian paragraph reads (0 = natural, higher = more machine-like).
+
+    Three cheap signals: stock phrases and bureaucratese per 100 words, an even sentence rhythm
+    (low variation of sentence length), and a high share of nouns made from verbs.
+    """
+    words = par.split()
+    n = max(1, len(words))
+    low = par.lower()
+    cliches = sum(low.count(c) for c in _RU_CLICHES)
+    lengths = [len(s.split()) for s in _SENT_SPLIT.split(par.strip()) if s.strip()]
+    mean = sum(lengths) / len(lengths) if lengths else 0.0
+    cv = statistics.pstdev(lengths) / mean if len(lengths) >= 3 and mean else 0.6
+    nominal = len(_NOMINAL.findall(par))
+    score = min(3.0, cliches * 100.0 / n / 1.5)
+    if len(lengths) >= 3:
+        score += max(0.0, (0.45 - cv) / 0.45 * 2.0)
+    score += min(2.0, nominal * 100.0 / n / 6.0)
+    return {"score": round(score, 2), "cliches": cliches, "cv": round(cv, 2), "nominal": nominal, "words": len(words)}
+
+
+def _norm_numbers(s: str) -> set[str]:
+    """Numbers of a text, ignoring thousands separators (1 350 == 1350) and superscripts (m^2 == m²)."""
+    s = s.translate({0x00B2: "2", 0x00B3: "3"})
+    s = re.sub(r"(?<=\d)[\s ](?=\d{3}(?!\d))", "", s)
+    return set(_NUM_TOKEN.findall(s))
+
+
+def _refresh_guard(orig: str, new: str) -> str | None:
+    """Why a refreshed paragraph must be rejected, or None when it keeps the facts."""
+    letters = [c for c in new if c.isalpha()]
+    cyr = sum(1 for c in letters if "Ѐ" <= c <= "ӿ") / max(1, len(letters))
+    o_letters = [c for c in orig if c.isalpha()]
+    o_cyr = sum(1 for c in o_letters if "Ѐ" <= c <= "ӿ") / max(1, len(o_letters))
+    if cyr < o_cyr * 0.9:
+        return "language drifted"
+    lost = _norm_numbers(orig) - _norm_numbers(new)
+    if lost:
+        return f"numbers lost: {sorted(lost)}"
+    low_new = new.lower()
+    names = {w[:5].lower() for w in _CAP_WORD.findall(orig)}
+    gone = sorted(n for n in names if n not in low_new)
+    if gone:
+        return f"names lost: {gone[:4]}"
+    ratio = len(new.split()) / max(1, len(orig.split()))
+    if not 0.65 <= ratio <= 1.35:
+        return f"length changed x{ratio:.2f}"
+    if len(_SENT_SPLIT.split(new.strip())) < 0.6 * len(_SENT_SPLIT.split(orig.strip())):
+        return "sentences lost"
+    return None
+
+
+def _refresh_paragraphs(
+    parts: list[str], gen: Any, *, share: float, keep_model: bool, final_keep: str | None,
+    base_url: str, model: str,
+) -> tuple[str, dict[str, Any]]:
+    """Rewrite only the paragraphs that score as machine-like; keep every other one as it is.
+
+    At most `share` of the eligible paragraphs are rewritten, the most machine-like first. A rewrite
+    that loses a number or a name, changes the length a lot or leaves Russian is retried once and
+    otherwise dropped (the original paragraph stays).
+    """
+    min_words = max(1, _env_int("WATERMARKS_REFRESH_MIN_WORDS", 20))  # shorter paragraphs are captions, labels
+    threshold = float(_env("WATERMARKS_REFRESH_MIN_SCORE", "1.0") or 1.0)
+    scored = []
+    for k, piece in enumerate(parts):
+        if k % 2 == 0 and len(piece.split()) >= min_words:
+            sc = paragraph_machine_score(piece)
+            scored.append((k, sc))
+    flagged = sorted((x for x in scored if x[1]["score"] >= threshold), key=lambda x: -x[1]["score"])
+    flagged = flagged[: math.ceil(share * len(scored))] if scored else []
+    chosen = {k for k, _ in flagged}
+    out = list(parts)
+    st: dict[str, Any] = {
+        "paragraphs": sum(1 for k, p in enumerate(parts) if k % 2 == 0 and p.strip()),
+        "eligible": len(scored), "flagged": len(flagged), "rewritten": 0, "kept_guard": 0,
+        "threshold": threshold, "details": [],
+    }
+    try:
+        for k, sc in scored:
+            if k not in chosen:
+                continue
+            piece = parts[k]
+            lead = piece[: len(piece) - len(piece.lstrip())]
+            trail = piece[len(piece.rstrip()):]
+            reason: str | None = "no reply"
+            new = ""
+            for _ in range(2):
+                try:
+                    new = " ".join(gen(piece.strip(), "5m" if keep_model else None).split())
+                except Exception:  # noqa: BLE001 - one failed paragraph must not lose the whole text
+                    new = ""
+                    reason = "call failed"
+                    continue
+                reason = _refresh_guard(piece, new) if new else "no reply"
+                if reason is None:
+                    break
+            if reason is None:
+                out[k] = lead + new + trail
+                st["rewritten"] += 1
+            else:
+                st["kept_guard"] += 1
+            st["details"].append({"index": k // 2, "score": sc["score"], "kept_original": reason})
+    finally:
+        if keep_model and final_keep is not None:
+            try:
+                keep = int(final_keep) if final_keep.lstrip("-").isdigit() else final_keep
+                _http_json(base_url.rstrip("/") + "/api/generate", {"model": model, "keep_alive": keep}, {}, 30)
+            except Exception:  # best effort: Ollama's own timer unloads it anyway
+                pass
+    return "".join(out), st
+
+
 def apply_strategy(
     text: str,
     steps: list[tuple[str, float]],
@@ -1811,6 +1957,24 @@ def apply_strategy(
         extra: dict[str, Any] = {}
         if tactic == "mlm":
             cur = _mlm_infill(cur, intensity)
+        elif tactic == "refresh":
+            def _fresh(piece: str, keep: str | int | None = None) -> str:
+                prompt = build_prompt("humanize", piece, lang=lang, original_lang=original_lang, style=style)
+                extra_kw = {} if keep is None else {"keep_alive": keep}
+                return _generate_once(
+                    backend, base_url, model, api_key, prompt, timeout, min(temperature, 0.7),
+                    reasoning_effort, **extra_kw,
+                )
+
+            parts = _paragraph_parts(cur)
+            if parts is None:
+                parts = [cur]
+            cur, fresh_stats = _refresh_paragraphs(
+                parts, _fresh, share=intensity, keep_model=backend == "ollama",
+                final_keep=keep_after if keep_after is not None else _env("WATERMARKS_REWRITE_KEEP_ALIVE"),
+                base_url=base_url or "", model=model or "",
+            )
+            extra["refresh"] = fresh_stats
         elif tactic == "swap":
             cur, swap_stats = _swap_words(
                 cur,
@@ -1847,7 +2011,7 @@ def apply_strategy(
                     reasoning_effort, **extra_kw,
                 )
 
-            parts = _paragraph_parts(cur) if tactic == "paraphrase" and _per_paragraph() else None
+            parts = _paragraph_parts(cur) if tactic in ("paraphrase", "humanize") and _per_paragraph() else None
             if parts is None:
                 cur = _whole(cur, keep_after)
             else:

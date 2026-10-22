@@ -1,0 +1,27 @@
+[
+ {
+  "text": "otchet_text_local.txt",
+  "strategy": "B_refresh",
+  "sec": 47,
+  "paragraphs": [
+   53,
+   53
+  ],
+  "unchanged_paragraphs": 48,
+  "numbers_lost": [],
+  "numbers_new": [],
+  "names_lost": [],
+  "divergence": 0.16,
+  "words": [
+   1298,
+   1300
+  ],
+  "refresh": {
+   "eligible": 26,
+   "flagged": 6,
+   "rewritten": 5,
+   "kept_guard": 1
+  },
+  "swap": null
+ }
+]
