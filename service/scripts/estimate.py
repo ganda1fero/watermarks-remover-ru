@@ -33,6 +33,9 @@ DEFAULTS: dict[str, float] = {
     "swap_seconds_per_swap_plain": 0.47,  # about 1.2 requests per swap
     # whole-text paraphrase, model already loaded, texts cut into chunks of <=450 words
     "paraphrase_seconds_per_100_words": 8.0,
+    # refresh rewrites only the machine-like paragraphs (about a quarter of a typical text), so per 100 words of the
+    # WHOLE text it costs much less than paraphrasing everything
+    "refresh_seconds_per_100_words": 4.5,
 }
 _EMA = 0.4  # weight of the newest run
 _MIN_SWAPS = 5  # ignore tiny runs when calibrating
@@ -50,7 +53,7 @@ def chunk_words() -> int:
 MAX_PATCH_EDITS = 500
 
 # tactics whose cost grows with the whole text (one long generation) rather than per word
-_WHOLE_TEXT = {"paraphrase", "humanize", "structural", "backtranslate", "chunk", "code"}
+_WHOLE_TEXT = {"paraphrase", "humanize", "structural", "backtranslate", "chunk", "code", "refresh"}
 
 
 def state_path() -> Path:
@@ -100,8 +103,17 @@ def record_run(model: str, verify: bool, steps: list[dict[str, Any]]) -> None:
 # Layer B modes offered to the user: (id, title, strategy, meaning check, what it does).
 # `options` of a mode is exactly what a client passes to /clean to run it.
 MODES: list[tuple[str, str, str, bool | None, str]] = [
+    ("refresh_swap", "Освежение + замена слов (с проверкой смысла)", "refresh@0.8,swap@0.2", True,
+     "Сначала переписываются только «машинные» абзацы (канцелярит, ровный ритм), остальные остаются как есть; "
+     "затем ~20% слов заменяются синонимами с проверкой смысла. Бережно к терминам и фактам, рекомендуется."),
+    ("refresh_swap_fast", "Освежение + замена слов (без проверки смысла)", "refresh@0.8,swap@0.2", False,
+     "То же, но замены слов не проверяются: быстрее, зато больше неудачных синонимов (около 58% годных вместо 74%)."),
+    ("refresh", "Только освежение", "refresh@0.8", None,
+     "Переписываются только «машинные» абзацы, слов по одному не меняют. Быстро и щадяще; на «нормальном» "
+     "тексте может почти ничего не изменить."),
     ("paraphrase", "Только перефразирование", "paraphrase@0.8", None,
-     "Модель переписывает текст целиком (перестраивает предложения). Быстрее всего; слов по одному не заменяет."),
+     "Модель переписывает весь текст целиком (перестраивает предложения). Может менять термины и терять детали; "
+     "слов по одному не заменяет."),
     ("paraphrase_swap", "Перефразирование + замена слов (с проверкой смысла)", "paraphrase@0.8,swap@0.2", True,
      "После перефразирования ещё ~20% слов заменяются синонимами, и каждая замена проверяется. "
      "Сильнее всего меняет текст, качество замен лучшее."),
@@ -259,7 +271,9 @@ def estimate_text(
                                "seconds": round(sec, 1)})
             else:
                 key = f"whole|{model}|{tactic}"
-                per100 = state.get(key, {}).get("value") or DEFAULTS["paraphrase_seconds_per_100_words"]
+                per100 = state.get(key, {}).get("value") or DEFAULTS.get(
+                    f"{tactic}_seconds_per_100_words", DEFAULTS["paraphrase_seconds_per_100_words"]
+                )
                 samples += state.get(key, {}).get("n", 0)
                 sec = words / 100.0 * per100
                 detail.append({"tactic": tactic, "seconds_per_100_words": round(per100, 2),

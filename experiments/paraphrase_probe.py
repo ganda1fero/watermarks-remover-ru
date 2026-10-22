@@ -19,6 +19,7 @@ MODEL = sys.argv[1]
 CHUNK_WORDS = int(sys.argv[2]) if len(sys.argv) > 2 else 450
 os.environ["WATERMARKS_REWRITE_NUM_CTX"] = sys.argv[3] if len(sys.argv) > 3 else "4096"
 os.environ["WATERMARKS_REWRITE_KEEP_ALIVE"] = "10m"
+TACTIC = os.environ.get("PROBE_TACTIC", "paraphrase")  # paraphrase | humanize (Russian "оживляющий" prompt)
 
 NUM = re.compile(r"\d[\d.,]*\d|\d")
 CAP = re.compile(r"(?<![.!?]\s)(?<!^)\b[А-ЯЁA-Z][а-яёa-z\-]{2,}")
@@ -49,7 +50,7 @@ for name in ("test_text.txt", "test_text_web.txt"):
     pieces, results = chunks(text, CHUNK_WORDS), []
     for piece in pieces:
         t0 = time.time()
-        out, st = r.apply_strategy(piece, [("paraphrase", 0.8)], backend="ollama", model=MODEL,
+        out, st = r.apply_strategy(piece, [(TACTIC, 0.8)], backend="ollama", model=MODEL,
                                    base_url="http://127.0.0.1:11434", api_key=None, timeout=900)
         sec = time.time() - t0
         n_in, n_out = set(NUM.findall(piece)), set(NUM.findall(out))
@@ -66,7 +67,8 @@ for name in ("test_text.txt", "test_text_web.txt"):
     rows.append((name, tot_w, tot_s, tot_s / tot_w * 100))
     print(f"== {name}: {len(pieces)} chunks, {tot_w} words, {tot_s:.0f} s, {tot_s / tot_w * 100:.1f} s per 100 words",
           flush=True)
-json.dump(outputs, open(os.path.join(HERE, "paraphrase_probe_out.json"), "w", encoding="utf-8"), ensure_ascii=False)
+slug = re.sub(r"[^A-Za-z0-9_-]+", "_", MODEL.split("/")[-1])
+json.dump(outputs, open(os.path.join(HERE, f"probe_{TACTIC}_{slug}.json"), "w", encoding="utf-8"), ensure_ascii=False)
 try:
     import urllib.request
     urllib.request.urlopen(urllib.request.Request(

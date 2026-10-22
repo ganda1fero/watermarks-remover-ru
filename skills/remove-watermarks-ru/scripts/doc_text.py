@@ -36,6 +36,21 @@ def _words(s: str) -> int:
     return len(s.split())
 
 
+# A bibliography entry ("// journal", "URL:", "С. 12", "P. 12") must never be paraphrased: titles, authors and
+# page numbers have to stay exactly as published.
+REF_RE = re.compile(r"\s//\s|URL:|https?://|[–—-]\s*(?:С|P|pp)\.\s*\d")
+
+
+def _content_skip_reason(text: str) -> str | None:
+    """Paragraphs the Russian rewrite must not touch whatever the file format is."""
+    letters = [c for c in text if c.isalpha()]
+    if letters and sum(1 for c in letters if "Ѐ" <= c <= "ӿ") / len(letters) < 0.5:
+        return "non_russian"
+    if REF_RE.search(text):
+        return "bibliography"
+    return None
+
+
 def _count(skipped: dict[str, int], reason: str) -> None:
     skipped[reason] = skipped.get(reason, 0) + 1
 
@@ -61,6 +76,8 @@ def _docx_skip_reason(par: Any, min_words: int) -> str | None:
     if style.startswith(HEADING_STYLES):
         return "heading_or_code_style"
     for tag, reason in (
+        # inline equations live between the runs: rewriting the words around them would misplace them
+        ("m:oMath", "formula"), ("m:oMathPara", "formula"),
         ("w:hyperlink", "hyperlink"), ("w:fldChar", "field"), ("w:fldSimple", "field"),
         ("w:drawing", "picture"), ("w:pict", "picture"), ("w:footnoteReference", "footnote"),
         ("w:endnoteReference", "footnote"), ("w:commentReference", "comment"), ("w:ins", "tracked_change"),
@@ -75,7 +92,7 @@ def _docx_skip_reason(par: Any, min_words: int) -> str | None:
         return "unusual_runs"
     if _words(text) < min_words:
         return "short"
-    return None
+    return _content_skip_reason(text)
 
 
 def _run_format(r: Any) -> tuple:
@@ -111,8 +128,8 @@ def rebuild_docx(path: Path, units: list[dict], new_texts: list[str], out: Path)
         par = pars[u["index"]]
         if "".join(r.text for r in par.runs) != u["text"]:
             raise ValueError(f"абзац {u['id']} в файле уже отличается от разобранного: разбери файл заново")
-        if not new.strip():
-            continue
+        if not new.strip() or new == u["text"]:
+            continue  # unchanged paragraphs keep their runs, so their formatting stays exactly as it was
         runs = [r for r in par.runs if r.text]
         if not runs:
             continue
@@ -201,6 +218,8 @@ def _add_md_unit(units: list, skipped: dict, line_nos: list[int], prefix: str, t
         _count(skipped, "markup_inside")
     elif _words(text) < min_words:
         _count(skipped, "short")
+    elif _content_skip_reason(text):
+        _count(skipped, _content_skip_reason(text))
     else:
         units.append({"id": len(units), "lines": line_nos, "prefix": prefix, "text": text})
 
@@ -241,6 +260,9 @@ def extract_txt(path: Path, min_words: int) -> tuple[list[dict], dict]:
             continue
         if _words(p) < min_words:
             _count(skipped, "short")
+            continue
+        if _content_skip_reason(p):
+            _count(skipped, _content_skip_reason(p))
             continue
         units.append({"id": len(units), "part": k, "text": p})
     return units, skipped
@@ -284,6 +306,9 @@ def extract_pdf(path: Path, min_words: int) -> tuple[list[dict], dict]:
                     continue
                 if _words(text) < min_words:
                     _count(skipped, "short")
+                    continue
+                if _content_skip_reason(text):
+                    _count(skipped, _content_skip_reason(text))
                     continue
                 units.append({"id": len(units), "page": pno, "text": text})
     if not units:
