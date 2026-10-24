@@ -190,3 +190,24 @@ def test_unchanged_paragraphs_keep_their_formatting(tmp_path, capsys):
     assert res["mixed_format_paragraphs_flattened"] == 0  # the bold run in the third paragraph is intact
     bold = [r.text for p in docx.Document(str(out)).paragraphs for r in p.runs if r.bold]
     assert "жирное слово" in bold
+
+
+def test_check_flags_keep_marks_added_by_rebuild(tmp_path, capsys):
+    src, work, out = tmp_path / "in.docx", tmp_path / "work", tmp_path / "out.docx"
+    _make_docx(src)
+    assert _run(["extract", str(src), str(work)]) == 0
+    capsys.readouterr()
+    cleaned = tmp_path / "cleaned.txt"
+    cleaned.write_text((work / "text.txt").read_text(encoding="utf-8"), encoding="utf-8")
+    assert _run(["rebuild", str(src), str(work), str(cleaned), str(out)]) == 0
+    capsys.readouterr()
+    before = doc_text.docx_keep_marks(out)
+    d = docx.Document(str(out))
+    d.paragraphs[1].paragraph_format.keep_with_next = True
+    d.paragraphs[1].paragraph_format.page_break_before = False  # explicit off: no square
+    d.save(str(out))
+    assert doc_text.docx_keep_marks(out) == before + 1
+    _run(["check", str(src), str(out), str(work)])
+    res = json.loads(capsys.readouterr().out)
+    assert res["ok"] is False and res["keep_marks"] == before + 1
+    assert any("квадратики" in i for i in res["issues"])
