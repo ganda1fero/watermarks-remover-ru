@@ -52,6 +52,12 @@ def main() -> int:
         help="Images/audio/video: only drop C2PA/AI-looking segments",
     )
     p.add_argument(
+        "--keep-paragraph-keep-marks",
+        action="store_true",
+        help="DOCX: keep 'keep with next'/'keep lines together'/'page break before' "
+        "(the black squares Word shows in the margin)",
+    )
+    p.add_argument(
         "--as",
         dest="force_type",
         choices=("auto", "text", "image", "container", "av"),
@@ -230,7 +236,13 @@ def main() -> int:
         return 1 if residual else 0
 
     try:
-        result = clean_container(src, dest, fmt=container_fmt, deep_images=args.deep_images)
+        result = clean_container(
+            src,
+            dest,
+            fmt=container_fmt,
+            deep_images=args.deep_images,
+            strip_keep_marks=not args.keep_paragraph_keep_marks,
+        )
     except Exception as e:
         eprint(f"error: {e}")
         return 1

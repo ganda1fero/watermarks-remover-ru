@@ -142,6 +142,28 @@ def rebuild_docx(path: Path, units: list[dict], new_texts: list[str], out: Path)
     return {"mixed_format_paragraphs_flattened": flattened}
 
 
+_KEEP_MARK_RE = re.compile(r"<w:(?:keepNext|keepLines|pageBreakBefore)\b([^>]*?)(?:/>|>)")
+
+
+def docx_keep_marks(path: Path) -> int:
+    """Число отметок «Не отрывать от следующего», «Не разрывать абзац», «С новой страницы».
+
+    Word рисует их чёрными квадратиками на полях; в итоговом файле их быть не должно
+    (их снимает слой A сервиса). Явно выключенные (w:val="0") квадратик не дают и не считаются.
+    """
+    import zipfile
+
+    total = 0
+    with zipfile.ZipFile(path) as zf:
+        for name in zf.namelist():
+            if name.startswith("word/") and name.endswith(".xml"):
+                xml = zf.read(name).decode("utf-8", errors="replace")
+                for m in _KEEP_MARK_RE.finditer(xml):
+                    if not re.search(r"""w:val\s*=\s*["'](?:0|false|off)["']""", m.group(1)):
+                        total += 1
+    return total
+
+
 def fingerprint_docx(path: Path) -> dict:
     from docx import Document
 
@@ -153,6 +175,7 @@ def fingerprint_docx(path: Path) -> dict:
         "pictures": len(doc.inline_shapes),
         "styles": [(p.style.name if p.style is not None else "") for p in pars],
         "texts": ["".join(r.text for r in p.runs) for p in pars],
+        "keep_marks": docx_keep_marks(path),
     }
 
 
@@ -394,6 +417,12 @@ def cmd_check(a: argparse.Namespace) -> dict:
                            if k not in touched and x != y]
         if changed_outside:
             issues.append(f"изменились абзацы вне списка обработанных: {changed_outside[:10]}")
+        if after["keep_marks"] > before["keep_marks"]:
+            issues.append(
+                f"добавлены отметки-квадратики (keepNext/keepLines/pageBreakBefore): "
+                f"было {before['keep_marks']}, стало {after['keep_marks']}; их ставить нельзя"
+            )
+        return {"ok": not issues, "issues": issues, "keep_marks": after["keep_marks"]}
     elif inp.suffix.lower() in (".md", ".markdown"):
         for key in ("headings", "code_fences", "links"):
             if before[key] != after[key]:

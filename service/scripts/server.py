@@ -99,6 +99,8 @@ ALLOWED_CLEAN_OPTIONS = {
     "normalize_spaces": bool,
     "keep_non_ai_metadata": bool,
     "also_layer_a_text": bool,
+    # DOCX: drop paragraph keep marks (black squares in Word's margin); default on.
+    "strip_keep_marks": bool,
     "remove_pixel": str,
     "remove_audio_watermark": bool,
     "strip_all_metadata": bool,
@@ -1367,6 +1369,7 @@ def _clean_payload(data: bytes, name: str, options: dict[str, Any]) -> dict[str,
                 also_layer_a_text=bool(options.get("also_layer_a_text", True)),
                 deep_images=str(options.get("deep_images", "auto")),
                 normalize_spaces=bool(options.get("normalize_spaces", True)),
+                strip_keep_marks=bool(options.get("strip_keep_marks", True)),
             )
             cleaned_bytes = dest.read_bytes()
             report = {"kind": "container", **result}

@@ -48,6 +48,7 @@ curl -s -X POST "$WM/patch"    -H "Content-Type: application/json" --data-binary
 | `rewrite_model` | модель Ollama на этот запрос вместо `WATERMARKS_REWRITE_MODEL` |
 | `meaning_check` | включить (true) или выключить (false) проверку смысла замен на этот запрос |
 | `strategy` | стратегия слоя B: `refresh@0.8` (освежение), `swap@0.2`, `paraphrase@0.8` или сочетания, например `refresh@0.8,swap@0.2` (по умолчанию); готовые наборы приходят в `modes` ответа `/estimate` |
+| `strip_keep_marks` | только `/clean` для `.docx`: убрать «Не отрывать от следующего», «Не разрывать абзац» и «С новой страницы» (чёрные квадратики на полях в Word); по умолчанию `true`, «С новой страницы» заменяется явным разрывом страницы. В `report.actions` строка `drop paragraph keep marks: …` |
 
 ## Ответ `/estimate`
 

@@ -5,6 +5,7 @@ Stdlib-first; PDF prefers optional exiftool/c2patool when present.
 """
 
 import base64
+import bisect
 import io
 import os
 import posixpath
@@ -1723,8 +1724,143 @@ def _prune_opf_manifest(raw: bytes, opf_name: str, dropped: set[str]) -> tuple[b
     return new.encode("utf-8"), removed[0]
 
 
+# Paragraph "keep" properties. Word draws a small black square in the left
+# margin (formatting marks on) for every paragraph that has one of them, so a
+# document formatted by a script shows hundreds of squares. They are layout
+# flags, not text; stripping them changes only pagination.
+_DOCX_KEEP_MARK_RE = re.compile(
+    r"<w:(keepNext|keepLines|pageBreakBefore)\b([^>]*?)(?:/>|>\s*</w:\1>)"
+)
+_DOCX_KEEP_MARKS = ("keepNext", "keepLines", "pageBreakBefore")
+_DOCX_OFF_VALUES = {"0", "false", "off"}
+_DOCX_PAGE_BREAK_RUN = '<w:r><w:br w:type="page"/></w:r>'
+
+
+def _docx_flag_on(attrs: str) -> bool:
+    """An OOXML on/off property is on unless w:val says 0/false/off."""
+    m = re.search(r"""w:val\s*=\s*["']([^"']*)["']""", attrs)
+    return not m or m.group(1).strip().lower() not in _DOCX_OFF_VALUES
+
+
+def _docx_direct_flag(ppr: str, flag: str) -> bool | None:
+    """Value of *flag* set directly in a pPr block (tracked-change history excluded)."""
+    top = re.sub(r"<w:pPrChange\b.*?</w:pPrChange>", "", ppr, flags=re.S)
+    for m in _DOCX_KEEP_MARK_RE.finditer(top):
+        if m.group(1) == flag:
+            return _docx_flag_on(m.group(2))
+    return None
+
+
+def _docx_page_break_styles(styles_xml: str) -> set[str]:
+    """Style ids whose paragraphs start on a new page (pageBreakBefore, incl. basedOn)."""
+    own: dict[str, bool | None] = {}
+    parent: dict[str, str] = {}
+    for os_, oe, cs_, _ce in _iter_tag_blocks(
+        styles_xml, re.compile(r"<w:style\b[^>]*>"), re.compile(r"</w:style>")
+    ):
+        sid = re.search(r"""w:styleId\s*=\s*["']([^"']*)["']""", styles_xml[os_:oe])
+        if not sid:
+            continue
+        body = styles_xml[oe:cs_]
+        own[sid.group(1)] = _docx_direct_flag(body, "pageBreakBefore")
+        based = re.search(r"""<w:basedOn\b[^>]*w:val\s*=\s*["']([^"']*)["']""", body)
+        if based:
+            parent[sid.group(1)] = based.group(1)
+    result: set[str] = set()
+    for sid in own:
+        cur, seen = sid, set()
+        while cur in own and cur not in seen:
+            seen.add(cur)
+            if own[cur] is not None:
+                if own[cur]:
+                    result.add(sid)
+                break
+            cur = parent.get(cur, "")
+    return result
+
+
+def _docx_ppr_end(xml_text: str, start: int) -> int | None:
+    """End index of the pPr element opening at *start* (nested pPr inside pPrChange counted)."""
+    depth = 0
+    for m in re.compile(r"<w:pPr\b[^>]*?(/?)>|</w:pPr>").finditer(xml_text, start):
+        if m.group(0).startswith("</"):
+            depth -= 1
+        elif m.group(1):
+            if depth == 0:
+                return m.end()
+            continue
+        else:
+            depth += 1
+        if depth == 0:
+            return m.end()
+    return None
+
+
+def _strip_docx_keep_marks(
+    xml_text: str, *, page_break_styles: frozenset[str] | set[str] = frozenset(), body: bool = False
+) -> tuple[str, dict[str, int]]:
+    """Remove keepNext/keepLines/pageBreakBefore from a WordprocessingML part.
+
+    keepNext and keepLines are simply dropped (tables and headings may then
+    break across pages). pageBreakBefore would move text if dropped, so in the
+    main body (*body*) a paragraph that started on a new page through it, set
+    directly or through a style in *page_break_styles*, gets an explicit page
+    break run instead; Word shows no square for that. Inside tables no break is
+    inserted (Word ignores pageBreakBefore there). Flags explicitly set off
+    show no square and are left alone.
+    """
+    counts = dict.fromkeys(_DOCX_KEEP_MARKS, 0)
+    counts["page_breaks_inserted"] = 0
+
+    if body:
+        tbl_opens = [m.start() for m in re.finditer(r"<w:tbl\b[^>]*>", xml_text)]
+        tbl_closes = [m.start() for m in re.finditer(r"</w:tbl>", xml_text)]
+        inserts: list[int] = []
+        for m in re.finditer(r"<w:p\b[^>]*>", xml_text):
+            if m.group(0).endswith("/>"):
+                continue
+            pos = m.start()
+            if bisect.bisect_left(tbl_opens, pos) > bisect.bisect_left(tbl_closes, pos):
+                continue
+            j = m.end()
+            while j < len(xml_text) and xml_text[j].isspace():
+                j += 1
+            if not re.match(r"<w:pPr\b", xml_text[j : j + 8]):
+                continue
+            end = _docx_ppr_end(xml_text, j)
+            if end is None:
+                continue
+            ppr = xml_text[j:end]
+            direct = _docx_direct_flag(ppr, "pageBreakBefore")
+            style = re.search(r"""<w:pStyle\b[^>]*w:val\s*=\s*["']([^"']*)["']""", ppr)
+            if direct or (direct is None and style and style.group(1) in page_break_styles):
+                inserts.append(end)
+        if inserts:
+            parts, last = [], 0
+            for at in inserts:
+                parts.append(xml_text[last:at])
+                parts.append(_DOCX_PAGE_BREAK_RUN)
+                last = at
+            parts.append(xml_text[last:])
+            xml_text = "".join(parts)
+            counts["page_breaks_inserted"] = len(inserts)
+
+    def _drop(m: re.Match[str]) -> str:
+        if not _docx_flag_on(m.group(2)):
+            return m.group(0)
+        counts[m.group(1)] += 1
+        return ""
+
+    return _DOCX_KEEP_MARK_RE.sub(_drop, xml_text), counts
+
+
 def _scrub_ooxml_zip(
-    data: bytes, fmt: str, *, also_layer_a_text: bool = True, normalize_spaces: bool = True
+    data: bytes,
+    fmt: str,
+    *,
+    also_layer_a_text: bool = True,
+    normalize_spaces: bool = True,
+    strip_keep_marks: bool = False,
 ) -> tuple[bytes, list[str]]:
     """Scrub provenance and Layer-A carriers from an OOXML zip container.
 
@@ -1732,14 +1868,26 @@ def _scrub_ooxml_zip(
     customXml, Content_Types overrides) are scrubbed or dropped, embedded media
     under ``word``/``xl``/``ppt`` are cleaned, and text runs are Layer-A scrubbed
     when requested. Binary docProps members (e.g. the thumbnail) are kept
-    byte-safe. Returns the rewritten bytes and a list of human-readable actions.
+    byte-safe. With *strip_keep_marks* (DOCX only) paragraph keep properties are
+    removed from every ``word/`` XML part (see _strip_docx_keep_marks).
+    Returns the rewritten bytes and a list of human-readable actions.
     """
     actions: list[str] = []
     budget = [0]
     layer_removed = 0
     layer_replaced = 0
+    keep_counts: dict[str, int] = {}
     kept: list[tuple[zipfile.ZipInfo, bytes]] = []
+    strip_keep_marks = strip_keep_marks and fmt == "docx"
     with zipfile.ZipFile(io.BytesIO(data)) as zin:
+        page_break_styles: set[str] = set()
+        if strip_keep_marks and "word/styles.xml" in zin.namelist():
+            # The body is usually stored before styles.xml, so read the styles
+            # first: paragraphs whose style breaks the page need an explicit break.
+            styles_raw = _read_zip_member(zin, zin.getinfo("word/styles.xml"), [0])
+            page_break_styles = _docx_page_break_styles(
+                styles_raw.decode("utf-8", errors="replace")
+            )
         for info in zin.infolist():
             _check_zip_budget(info, budget)
             name = info.filename
@@ -1861,6 +2009,19 @@ def _scrub_ooxml_zip(
                         layer_replaced += rp
                         raw = new.encode("utf-8")
 
+            # 6. Paragraph keep marks (the black squares Word shows in the margin)
+            if strip_keep_marks and name.startswith("word/") and name.endswith(".xml"):
+                text = raw.decode("utf-8", errors="replace")
+                new, counts = _strip_docx_keep_marks(
+                    text,
+                    page_break_styles=page_break_styles,
+                    body=name == "word/document.xml",
+                )
+                if new != text:
+                    for key, n in counts.items():
+                        keep_counts[key] = keep_counts.get(key, 0) + n
+                    raw = new.encode("utf-8")
+
             kept.append((info, raw))
 
     kept_names = {info.filename for info, _ in kept}
@@ -1879,19 +2040,30 @@ def _scrub_ooxml_zip(
             zout.writestr(info, raw)
     if layer_removed or layer_replaced:
         actions.append(f"layer A text: removed={layer_removed} replaced={layer_replaced}")
+    if any(keep_counts.values()):
+        actions.append(
+            "drop paragraph keep marks: "
+            + " ".join(f"{k}={keep_counts.get(k, 0)}" for k in _DOCX_KEEP_MARKS)
+            + f" (page breaks inserted={keep_counts.get('page_breaks_inserted', 0)})"
+        )
     if not actions:
         actions.append(f"no {fmt.upper()} metadata parts removed")
     return out_buf.getvalue(), actions
 
 
 def clean_docx(
-    data: bytes, *, also_layer_a_text: bool = True, normalize_spaces: bool = True
+    data: bytes,
+    *,
+    also_layer_a_text: bool = True,
+    normalize_spaces: bool = True,
+    strip_keep_marks: bool = True,
 ) -> tuple[bytes, list[str]]:
     return _scrub_ooxml_zip(
         data,
         "docx",
         also_layer_a_text=also_layer_a_text,
         normalize_spaces=normalize_spaces,
+        strip_keep_marks=strip_keep_marks,
     )
 
 
@@ -3070,8 +3242,12 @@ def clean_container(
     also_layer_a_text: bool = True,
     deep_images: str = "auto",
     normalize_spaces: bool = True,
+    strip_keep_marks: bool = True,
 ) -> dict[str, Any]:
     """Clean container metadata; optionally Layer-A scrub text bodies for md/html.
+
+    ``strip_keep_marks`` (DOCX) removes the paragraph keep properties that Word
+    shows as black squares in the margin; see _strip_docx_keep_marks.
 
     ``fmt`` pins the container format when the caller already knows it. This
     matters for ``--in-place`` flows where *path* is a ``.bak`` copy whose
@@ -3094,7 +3270,10 @@ def clean_container(
         meta.update(meta_extra)
     elif fmt == "docx":
         cleaned, actions = clean_docx(
-            data, also_layer_a_text=also_layer_a_text, normalize_spaces=normalize_spaces
+            data,
+            also_layer_a_text=also_layer_a_text,
+            normalize_spaces=normalize_spaces,
+            strip_keep_marks=strip_keep_marks,
         )
         safe_write_bytes(dest, cleaned)
     elif fmt == "xlsx":
